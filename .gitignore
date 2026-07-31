@@ -1,0 +1,36 @@
+# Rust build artifacts
+/target
+**/target
+
+# Bundled binary assets — provisioned locally via scripts/setup-assets.sh, not tracked in git
+/assets/models/*.onnx
+/assets/lib/*.so*
+/tests/fixtures/*.wav
+
+# Release build outputs + provisioning scratch
+/dist
+/.venv-assets
+/.build-tools
+
+# Editor / OS cruft
+*.swp
+*~
+.DS_Store
+
+# demo clips are rebuilt by docs/demo/make-demos.py and attached at publish time
+/docs/demo/build/
+/docs/demo/*.mp4
+.deploy-host
+
+# Local experiments and personal recordings/checkpoints
+/models/
+/personal-eval/
+/personal-baselines/
+/scripts/__pycache__/
+/scripts/codex_limits_status.py
+/HANDOFF_CONTEXT_*.txt
+
+# Raw icon exports (bulky, metadata-laden ~1 MB each); the cleaned masters
+# and the hicolor ladder are the committed artifacts.
+/packaging/tray/tray*.png
+/packaging/flatpak/ci-tree-manifest.yml

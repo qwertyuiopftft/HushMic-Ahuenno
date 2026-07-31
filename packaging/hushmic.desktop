@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=HushMic
+Comment=Real-time microphone noise suppression
+# Flag-less: starts the tray AND opens the A/B window (or asks a running
+# instance to open it). Autostart entries use `hushmic --tray` (silent).
+Exec=hushmic
+Icon=hushmic
+Terminal=false
+Categories=AudioVideo;Audio;
