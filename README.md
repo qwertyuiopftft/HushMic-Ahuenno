@@ -1,4 +1,4 @@
-# HushMic-Ahuenno
+# HushMic
 
 [Русская версия / Russian version](README.ru.md)
 
