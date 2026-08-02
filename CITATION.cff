@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If HushMic-Ahuenno helps your work, please cite the repository."
+title: "HushMic-Ahuenno"
+abstract: >-
+  Real-time Linux microphone noise suppression with a PipeWire virtual
+  microphone, optional speaker personalization and experimental phrase
+  triggering.
+type: software
+authors:
+  - family-names: "qwertyuiopftft"
+    given-names: "HushMic-Ahuenno contributor"
+repository-code: "https://github.com/qwertyuiopftft/HushMic-Ahuenno"
+license: "MIT OR Apache-2.0"
+keywords:
+  - audio
+  - noise-suppression
+  - PipeWire
+  - Rust
+  - Linux
+  - speech-enhancement

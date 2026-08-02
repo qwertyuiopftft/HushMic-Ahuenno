@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">HushMic-Ahuenno</title>
+  <desc id="desc">Real-time Linux microphone cleanup with optional speaker personalization</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#07151d"/>
+      <stop offset="1" stop-color="#12384a"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="0" x2="1">
+      <stop offset="0" stop-color="#55e6c1"/>
+      <stop offset="1" stop-color="#68a9ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="300" rx="28" fill="url(#bg)"/>
+  <g opacity=".18" fill="none" stroke="#8be9fd">
+    <path d="M0 62h1200M0 150h1200M0 238h1200"/>
+    <path d="M80 0v300M240 0v300M400 0v300M560 0v300M720 0v300M880 0v300M1040 0v300"/>
+  </g>
+  <path d="M38 176 C76 176 76 126 114 126 S152 214 190 214 228 96 266 96 304 180 342 180 380 142 418 142 456 198 494 198 532 112 570 112 608 186 646 186 684 132 722 132 760 208 798 208 836 88 874 88 912 170 950 170 988 126 1026 126 1064 194 1102 194 1140 146 1178 146" fill="none" stroke="url(#wave)" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="84" cy="70" r="14" fill="#55e6c1"/>
+  <text x="118" y="82" fill="#c9f7ef" font-family="sans-serif" font-size="25" letter-spacing="4">REAL-TIME AUDIO ML</text>
+  <text x="62" y="142" fill="#ffffff" font-family="sans-serif" font-size="58" font-weight="700">HushMic-Ahuenno</text>
+  <text x="66" y="222" fill="#b6d4e0" font-family="sans-serif" font-size="25">Linux · PipeWire · Rust · DPDFNet · speaker personalization</text>
+</svg>

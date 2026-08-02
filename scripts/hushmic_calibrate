@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "Использование:"
+  echo "  hushmic-calibrate record LABEL [SECONDS]"
+  echo "  hushmic-calibrate list"
+  echo "  hushmic-calibrate status"
+  echo
+  echo "LABEL: target-normal | target-dynamic | other | overlap | real-use | failure"
+}
+
+state_root="${XDG_STATE_HOME:-${HOME}/.local/state}"
+capture_root="${HUSHMIC_CALIBRATION_ROOT:-${state_root}/hushmic/calibration}"
+raw_source="${HUSHMIC_RAW_SOURCE:-}"
+base_source="${HUSHMIC_BASE_SOURCE:-hushmic_source}"
+ai_source="${HUSHMIC_PERSONAL_SOURCE:-hushmic_ai_source}"
+
+command_name="${1:-status}"
+case "$command_name" in
+  status)
+    echo "Службы:"
+    systemctl --user show hushmic-base.service hushmic-personal.service \
+      -p Id -p ActiveState -p SubState -p NRestarts
+    echo
+    echo "Источники:"
+    if [[ -n "$raw_source" ]]; then
+      pactl list short sources \
+        | awk -v raw="$raw_source" -v base="$base_source" -v ai="$ai_source" \
+          '$2 == raw || $2 == base || $2 == ai'
+    else
+      pactl list short sources \
+        | awk -v base="$base_source" -v ai="$ai_source" \
+          '$2 == base || $2 == ai'
+      echo "HUSHMIC_RAW_SOURCE не задан; сырой источник не выбран."
+    fi
+    echo
+    echo "Каталог записей: $capture_root"
+    ;;
+  list)
+    if [[ ! -d "$capture_root" ]]; then
+      echo "Записей пока нет"
+      exit 0
+    fi
+    find "$capture_root" -mindepth 1 -maxdepth 1 -type d \
+      -printf '%f\n' | sort
+    ;;
+  record)
+    label="${2:-}"
+    seconds="${3:-30}"
+    case "$label" in
+      target-normal|target-dynamic|other|overlap|real-use|failure)
+        ;;
+      *)
+        echo "Неверный LABEL: $label" >&2
+        usage >&2
+        exit 2
+        ;;
+    esac
+    if [[ ! "$seconds" =~ ^[0-9]+$ ]] \
+      || (( seconds < 5 || seconds > 600 ))
+    then
+      echo "SECONDS должен быть целым числом от 5 до 600" >&2
+      exit 2
+    fi
+    if [[ "$label" == "other" || "$label" == "overlap" ]]; then
+      echo "Записывай другого человека только с его согласием."
+    fi
+    if [[ -z "$raw_source" ]]; then
+      echo "Задай HUSHMIC_RAW_SOURCE для записи сырого микрофона." >&2
+      exit 1
+    fi
+    for source_name in "$raw_source" "$base_source" "$ai_source"; do
+      if ! pactl list short sources | awk '{print $2}' \
+        | rg -Fxq "$source_name"
+      then
+        echo "Источник отсутствует: $source_name" >&2
+        exit 1
+      fi
+    done
+
+    timestamp="$(date +%Y%m%d-%H%M%S)"
+    capture_dir="$capture_root/${timestamp}-${label}"
+    mkdir -p "$capture_dir"
+    chmod 700 "$capture_root" "$capture_dir"
+    sample_count=$((seconds * 48000))
+
+    hushmic status --json > "$capture_dir/hushmic-status-before.json"
+    if [[ -f "${XDG_RUNTIME_DIR}/hushmic-personal/status.json" ]]; then
+      cp "${XDG_RUNTIME_DIR}/hushmic-personal/status.json" \
+        "$capture_dir/personal-status-before.json"
+    fi
+    pactl list short sources > "$capture_dir/sources-before.txt"
+    pactl list short source-outputs > "$capture_dir/routes-before.txt"
+
+    echo "Запись $seconds секунд: $label"
+    echo "Старт через 2 секунды…"
+    sleep 2
+    raw_pid=""
+    base_pid=""
+    ai_pid=""
+    stop_recorders() {
+      for recorder_pid in "$raw_pid" "$base_pid" "$ai_pid"; do
+        if [[ -n "$recorder_pid" ]] && kill -0 "$recorder_pid" 2>/dev/null; then
+          kill -INT "$recorder_pid" 2>/dev/null || true
+        fi
+      done
+    }
+    trap stop_recorders EXIT INT TERM
+    started_ns="$(date +%s%N)"
+    pw-record \
+      --target "$raw_source" \
+      --rate 48000 \
+      --channels 1 \
+      --format f32 \
+      --sample-count "$sample_count" \
+      "$capture_dir/raw-microphone.wav" &
+    raw_pid=$!
+    pw-record \
+      --target "$base_source" \
+      --rate 48000 \
+      --channels 1 \
+      --format f32 \
+      --sample-count "$sample_count" \
+      "$capture_dir/dpdfnet-output.wav" &
+    base_pid=$!
+    pw-record \
+      --target "$ai_source" \
+      --rate 48000 \
+      --channels 1 \
+      --format f32 \
+      --sample-count "$sample_count" \
+      "$capture_dir/personal-output.wav" &
+    ai_pid=$!
+
+    set +e
+    wait "$raw_pid"
+    raw_status=$?
+    wait "$base_pid"
+    base_status=$?
+    wait "$ai_pid"
+    ai_status=$?
+    set -e
+    trap - EXIT INT TERM
+    finished_ns="$(date +%s%N)"
+    if (( raw_status != 0 || base_status != 0 || ai_status != 0 )); then
+      echo \
+        "Ошибка записи: raw=$raw_status base=$base_status ai=$ai_status" \
+        >&2
+      exit 1
+    fi
+
+    hushmic status --json > "$capture_dir/hushmic-status-after.json"
+    if [[ -f "${XDG_RUNTIME_DIR}/hushmic-personal/status.json" ]]; then
+      cp "${XDG_RUNTIME_DIR}/hushmic-personal/status.json" \
+        "$capture_dir/personal-status-after.json"
+    fi
+    pactl list short source-outputs > "$capture_dir/routes-after.txt"
+    sha256sum \
+      "$capture_dir/raw-microphone.wav" \
+      "$capture_dir/dpdfnet-output.wav" \
+      "$capture_dir/personal-output.wav" \
+      > "$capture_dir/SHA256SUMS"
+    jq -n \
+      --arg format "hushmic-live-calibration-v1" \
+      --arg label "$label" \
+      --arg raw_source "$raw_source" \
+      --arg base_source "$base_source" \
+      --arg ai_source "$ai_source" \
+      --argjson seconds "$seconds" \
+      --argjson sample_rate 48000 \
+      --argjson started_ns "$started_ns" \
+      --argjson finished_ns "$finished_ns" \
+      '{
+        format: $format,
+        label: $label,
+        seconds: $seconds,
+        sample_rate: $sample_rate,
+        started_ns: $started_ns,
+        finished_ns: $finished_ns,
+        sources: {
+          raw: $raw_source,
+          dpdfnet: $base_source,
+          personal: $ai_source
+        },
+        files: {
+          raw: "raw-microphone.wav",
+          dpdfnet: "dpdfnet-output.wav",
+          personal: "personal-output.wav"
+        },
+        privacy: {
+          contains_voice: true,
+          local_only: true,
+          git_publish: false
+        }
+      }' > "$capture_dir/manifest.json"
+    chmod 600 "$capture_dir"/*
+    echo "Готово: $capture_dir"
+    echo "Файлы остаются только локально на втором SSD."
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
